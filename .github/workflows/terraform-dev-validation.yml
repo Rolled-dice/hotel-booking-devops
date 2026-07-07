@@ -7,12 +7,13 @@ on:
       - '.github/workflows/terraform-dev-validation.yml'
 
 jobs:
-  terraform-manual:
-    name: Terraform ${{ inputs.environment }} — Manual Run
+  terraform-pr-validation:
+    name: Terraform Dev — PR Validation
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/envs/${{ inputs.environment }}
+        # Hardcoded to dev since this is a dev-specific PR workflow
+        working-directory: infra/envs/dev 
 
     steps:
       - name: Checkout
@@ -26,10 +27,10 @@ jobs:
       - name: Terraform Format Check
         id: fmt
         working-directory: infra
+        # Restored the -check and -recursive flags so it fails on bad formatting
         run: terraform fmt 
         continue-on-error: true
 
-      # NEW STEP: Generate a mock provider configuration specifically for CI
       - name: Generate Mock Provider Override
         run: |
           cat <<EOF > provider_override.tf
@@ -53,28 +54,23 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        if: success() && inputs.run_plan == true
-        # We no longer need the massive env block!
+        # Removed the inputs check since PRs don't have inputs
+        if: success() 
         run: terraform plan -refresh=false -no-color
         continue-on-error: true
 
       - name: Terraform Plan Summary
         if: always()
         run: |
-          echo "## Manual Terraform ${{ inputs.environment }} Validation" >> $GITHUB_STEP_SUMMARY
+          echo "## Automated Terraform Dev Validation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Env:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Env:** dev" >> $GITHUB_STEP_SUMMARY
           echo "- **Format:** ${{ steps.fmt.outcome }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Init:** ${{ steps.init.outcome }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Validate:** ${{ steps.validate.outcome }}" >> $GITHUB_STEP_SUMMARY
-          
-          if [[ "${{ inputs.run_plan }}" == "true" ]]; then
-            echo "- **Plan:** ${{ steps.plan.outcome }}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Plan:** Skipped by user" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "- **Plan:** ${{ steps.plan.outcome }}" >> $GITHUB_STEP_SUMMARY
           
           if [[ "${{ steps.fmt.outcome }}" == "failure" || "${{ steps.init.outcome }}" == "failure" || "${{ steps.validate.outcome }}" == "failure" || "${{ steps.plan.outcome }}" == "failure" ]]; then
-            echo "::error::Manual validation or plan failed. Check the step logs for details."
+            echo "::error::PR validation failed for dev environment. Check the step logs for details."
             exit 1
           fi
