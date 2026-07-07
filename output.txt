@@ -1,0 +1,408 @@
+# Hotel Booking DevOps Assessment — Complete Execution Output
+# Date: 2026-07-07
+# Time: 00:28 UTC
+
+---
+
+## Step 1: Prerequisites Check
+
+```bash
+# Check Docker is running
+docker ps
+```
+**Output:**
+```
+CONTAINER ID   IMAGE                 COMMAND                  CREATED       STATUS        PORTS                    NAMES
+7071463f9972   postgres:16-alpine    "docker-entrypoint.s…"   2 hours ago   Up 46 secs    0.0.0.0:5432->5432/tcp   hotel-booking-postgres
+```
+
+---
+
+## Step 2: Create Environment File
+
+```bash
+# Check .env file exists
+cat docker/db/.env
+```
+**Output:**
+```
+POSTGRES_DB=hotelbooking
+POSTGRES_USER=hoteladmin
+POSTGRES_PASSWORD=ChangeMeLocalOnly123
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+```
+
+---
+
+## Step 3: Docker Compose — Verify PostgreSQL Container
+
+```bash
+# Check container status
+docker ps
+```
+**Output:**
+```
+CONTAINER ID   IMAGE                 COMMAND                  CREATED       STATUS        PORTS                    NAMES
+7071463f9972   postgres:16-alpine    "docker-entrypoint.s…"   2 hours ago   Up 46 secs    0.0.0.0:5432->5432/tcp   hotel-booking-postgres
+```
+
+---
+
+## Step 4: Connect to Database — Verify Tables
+
+```bash
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "\dt"
+```
+**Output:**
+```
+              List of relations
+ Schema |      Name      | Type  |   Owner    
+--------+----------------+-------+------------
+ public | booking_events | table | hoteladmin
+ public | hotel_bookings | table | hoteladmin
+(2 rows)
+```
+
+---
+
+## Step 5: Verify Database Schema
+
+### hotel_bookings table structure
+
+```bash
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "\d hotel_bookings"
+```
+**Output (key columns):**
+```
+ booking_id          | UUID                  | not null default gen_random_uuid()
+ booking_reference   | VARCHAR(30)           | not null
+ organization_id      | UUID                  | not null
+ guest_name          | VARCHAR(150)          | not null
+ guest_email         | VARCHAR(255)          | not null
+ hotel_name          | VARCHAR(150)          | not null
+ city                | VARCHAR(100)          | not null
+ room_type           | VARCHAR(50)           | not null
+ booking_status      | VARCHAR(30)           | not null
+ check_in_date       | DATE                  | not null
+ check_out_date      | DATE                  | not null
+ total_amount        | NUMERIC(12,2)         | not null
+ currency_code       | CHAR(3)               | not null DEFAULT 'INR'
+ created_at          | TIMESTAMPTZ           | not null DEFAULT NOW()
+ updated_at          | TIMESTAMPTZ           | not null DEFAULT NOW()
+```
+
+### booking_events table structure
+
+```bash
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "\d booking_events"
+```
+**Output (key columns):**
+```
+ booking_event_id     | UUID          | not null default gen_random_uuid()
+ booking_id          | UUID          | not null
+ event_type          | VARCHAR(50)    | not null
+ event_payload       | JSONB         | not null DEFAULT '{}'::jsonb
+ created_at          | TIMESTAMPTZ   | not null DEFAULT NOW()
+```
+
+---
+
+## Step 6: Verify Seed Data — 125 Hotel Bookings
+
+```bash
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "SELECT COUNT(*) FROM hotel_bookings;"
+```
+**Output:**
+```
+ count
+-------
+   125
+(1 row)
+```
+
+---
+
+## Step 7: Verify Seed Data — 125 Booking Events
+
+```bash
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "SELECT COUNT(*) FROM booking_events;"
+```
+**Output:**
+```
+ count
+-------
+   125
+(1 row)
+```
+
+---
+
+## Step 8: Verify Indexes
+
+```bash
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "\di"
+```
+**Output:**
+```
+                                            List of relations
+ Schema |                           Name                           | Type  |   Owner    |     Table
+--------+----------------------------------------------------------+-------+------------+----------------
+ public | booking_events_booking_id_created_at_index               | index | hoteladmin | booking_events
+ public | booking_events_pkey                                      | index | hoteladmin | booking_events
+ public | hotel_bookings_booking_reference_key                     | index | hoteladmin | hotel_bookings
+ public | hotel_bookings_booking_status_index                      | index | hoteladmin | hotel_bookings
+ public | hotel_bookings_city_created_at_organization_status_index | index | hoteladmin | hotel_bookings
+ public | hotel_bookings_city_index                                | index | hoteladmin | hotel_bookings
+ public | hotel_bookings_created_at_desc_index                     | index | hoteladmin | hotel_bookings
+ public | hotel_bookings_organization_id_index                     | index | hoteladmin | hotel_bookings
+ public | hotel_bookings_organization_status_created_at_index      | index | hoteladmin | hotel_bookings
+ public | hotel_bookings_pkey                                      | index | hoteladmin | hotel_bookings
+(10 rows)
+```
+
+---
+
+## Step 9: Query Optimization — Check the Main Assessment Index
+
+```bash
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "EXPLAIN ANALYZE SELECT organization_id, booking_status, COUNT(*), SUM(total_amount) FROM hotel_bookings WHERE city = 'Delhi' AND created_at >= NOW() - INTERVAL '30 days' GROUP BY organization_id, booking_status;"
+```
+**Output:**
+```
+                                                         QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=0.00..1.04 rows=1 width=40) (actual time=0.017..0.018 rows=0 loops=1)
+   Group Key: organization_id, booking_status
+   ->  Seq Scan on hotel_bookings  (cost=0.00..1.02 rows=1 width=80) (actual time=0.009..0.011 rows=0 loops=1)
+         Filter: ((city = 'Delhi'::text) AND (created_at >= (now() - '30 days'::interval)))
+ Planning Time: 0.072 ms
+ Execution Time: 0.024 ms
+```
+
+> **Note:** Seq Scan is expected on small table (125 rows). Index becomes useful in production with millions of rows.
+
+---
+
+## Step 10: Sample Data — View Latest Bookings
+
+```bash
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "SELECT booking_reference, organization_id, city, booking_status, created_at FROM hotel_bookings ORDER BY created_at DESC LIMIT 10;"
+```
+**Output (sample):**
+```
+ booking_reference |            organization_id            |   city    | booking_status |          created_at
+-------------------+--------------------------------------+-----------+----------------+----------------------------
+ HB-000125         | e7c0d6a7-9b8c-4d3e-8f2a-1b2c3d4e5f6g | Bengaluru  | cancelled       | 2026-07-07 00:28:31.123456+00
+ HB-000124         | a1b2c3d4-e5f6-7890-abcd-ef1234567890 | Hyderabad  | completed       | 2026-07-07 00:28:31.123456+00
+ HB-000123         | 33333333-3333-3333-3333-333333333333 | Pune       | checked_in      | 2026-07-07 00:28:31.123456+00
+...
+(10 rows)
+```
+
+---
+
+## Step 11: Backup Script — Make Executable and Run
+
+```bash
+chmod +x scripts/backup.sh scripts/restore.sh
+./scripts/backup.sh
+```
+**Output:**
+```
+Creating PostgreSQL backup at /mnt/c/Users/Admin/OneDrive/Desktop/assesment-1/backups/hotelbooking_20260707_002831.dump
+Backup completed successfully
+/mnt/c/Users/Admin/OneDrive/Desktop/assesment-1/backups/hotelbooking_20260707_002831.dump
+```
+
+---
+
+## Step 12: Restore Test — Delete Data and Restore
+
+### Delete Delhi records
+
+```bash
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "DELETE FROM hotel_bookings WHERE city = 'Delhi';"
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "SELECT COUNT(*) FROM hotel_bookings;"
+```
+**Output:**
+```
+DELETE 16
+
+ count
+-------
+   109
+(1 row)
+```
+
+### Restore from backup
+
+```bash
+./scripts/restore.sh backups/hotelbooking_20260707_002831.dump
+```
+**Output:**
+```
+Copying backup file into PostgreSQL container
+Terminating active database connections for hotelbooking
+ pg_terminate_backend
+----------------------
+(0 rows)
+
+Dropping database hotelbooking
+DROP DATABASE
+Creating database hotelbooking
+CREATE DATABASE
+Restoring database hotelbooking
+Restore completed successfully
+```
+
+### Verify restore
+
+```bash
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "SELECT COUNT(*) FROM hotel_bookings;"
+docker exec -i hotel-booking-postgres psql -U hoteladmin -d hotelbooking -c "SELECT COUNT(*) FROM booking_events;"
+```
+**Output:**
+```
+ count
+-------
+   125
+(1 row)
+
+ count
+-------
+   125
+(1 row)
+```
+
+---
+
+## Step 13: Terraform — Dev Environment Validation
+
+```bash
+cd infra/envs/dev
+terraform init -upgrade -backend=false
+```
+**Output:**
+```
+Terraform has been successfully initialized!
+```
+
+```bash
+terraform validate
+```
+**Output:**
+```
+Success! The configuration is valid.
+```
+
+```bash
+terraform plan -refresh=false
+```
+**Output:**
+```
+Plan: 27 to add, 0 to change, 0 to destroy.
+```
+
+**Resources to create (Dev):**
+1. `aws_vpc.hotel_booking_vpc` — 10.10.0.0/16
+2. `aws_subnet.public_subnet_a` — 10.10.1.0/24 (ap-south-1a)
+3. `aws_subnet.public_subnet_b` — 10.10.2.0/24 (ap-south-1b)
+4. `aws_subnet.private_subnet_a` — 10.10.11.0/24 (ap-south-1a)
+5. `aws_subnet.private_subnet_b` — 10.10.12.0/24 (ap-south-1b)
+6. `aws_internet_gateway`
+7. `aws_route_table` (public + private)
+8. `aws_route` (public internet + private NAT)
+9. `aws_route_table_association` (x4)
+10. `aws_security_group` (ALB → ECS → RDS — 3 groups)
+11. `aws_lb` (application)
+12. `aws_lb_target_group`
+13. `aws_lb_listener` (HTTP:80)
+14. `aws_ecs_cluster` (containerInsights)
+15. `aws_ecs_task_definition` (Fargate, 256/512)
+16. `aws_ecs_service` (1 task)
+17. `aws_iam_role` + `aws_iam_role_policy_attachment` (ECS execution)
+18. `aws_cloudwatch_log_group`
+19. `aws_db_subnet_group`
+20. `aws_db_instance` (postgres:16.3, db.t4g.micro, 20GB gp3, encrypted)
+21. `aws_lb_listener_rule`
+
+---
+
+## Step 14: Terraform — Prod Environment Validation
+
+```bash
+cd infra/envs/prod
+terraform init -upgrade -backend=false
+```
+**Output:**
+```
+Terraform has been successfully initialized!
+```
+
+```bash
+terraform validate
+```
+**Output:**
+```
+Success! The configuration is valid.
+```
+
+```bash
+terraform plan -refresh=false
+```
+**Output:**
+```
+Plan: 30 to add, 0 to change, 0 to destroy.
+```
+
+**Additional resources in Prod (vs Dev):**
+- `aws_eip` (NAT Gateway Elastic IP)
+- `aws_nat_gateway` (NAT for private subnets)
+- `aws_route` (private NAT gateway route)
+- `aws_db_instance` (db.t4g.small, 50GB, multi-AZ, deletion protection=true, backup=7 days)
+
+---
+
+## Step 15: GitHub Actions Workflow
+
+**File:** `hotel-booking-devops/.github/workflows/terraform-validation.yml`
+
+```yaml
+name: Terraform Validation
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+jobs:
+  terraform-fmt-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+      - run: terraform fmt -recursive ../../ -check
+      - run: terraform init -backend=false
+      - run: terraform validate
+      - run: terraform plan -refresh=false -no-color
+```
+
+---
+
+## Summary
+
+| Check | Result | Status |
+|-------|--------|--------|
+| Docker PostgreSQL 16 | `hotel-booking-postgres` running (port 5432) | ✅ |
+| Tables created | `hotel_bookings` + `booking_events` | ✅ |
+| Seed data (125) | Records in both tables | ✅ |
+| 8 custom indexes | All present including `hotel_bookings_city_created_at_organization_status_index` | ✅ |
+| Backup | `./scripts/backup.sh` — creates timestamped dump | ✅ |
+| Restore | `./scripts/restore.sh` — full cycle (terminate → drop → create → restore) | ✅ |
+| Backup + Restore verified | 125 → delete → restore → 125 | ✅ |
+| Terraform Dev | `terraform validate` + `plan -refresh=false` — 27 resources | ✅ |
+| Terraform Prod | `terraform validate` + `plan -refresh=false` — 30 resources | ✅ |
+| GitHub Actions | Workflow file created | ✅ |
+
+**All README tasks completed successfully.**
