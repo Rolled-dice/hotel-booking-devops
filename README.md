@@ -96,7 +96,10 @@ assesment-1/
 ├── hotel-booking-devops/
 │   └── .github/
 │       └── workflows/
-│           └── terraform-validation.yml
+│           └── terraform-Dev-validation.yml
+│           └── terraform-Manual-Trigger.yml
+│           └── terraform-Prod-validation.yml
+|
 └── .gitignore
 ```
 
