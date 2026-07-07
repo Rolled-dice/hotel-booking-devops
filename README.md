@@ -296,31 +296,47 @@ terraform init -backend=false
 
 ## Part 3: GitHub Actions Terraform Validation
 
-The GitHub Actions workflow is available at:
+Two separate GitHub Actions workflows are available — one for each environment.
+
+### Dev Workflow
 
 ```text
-.github/workflows/terraform-validation.yml
+.github/workflows/terraform-dev-validation.yml
 ```
 
-The workflow runs on pull requests and performs:
+Triggers on PRs changing `infra/envs/dev/**`.
+
+### Prod Workflow
 
 ```text
-terraform fmt
-terraform init
-terraform validate
-terraform plan
+.github/workflows/terraform-prod-validation.yml
 ```
 
-Terraform plan runs only when AWS credentials are configured as GitHub repository secrets.
+Triggers on PRs changing `infra/envs/prod/**`.
 
-Required secrets:
+### What Each Workflow Does
 
-```text
-AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY
+1. **Terraform Format** — `terraform fmt -recursive ../../`
+2. **Terraform Init** — `terraform init -backend=false -upgrade`
+3. **Terraform Validate** — `terraform validate`
+4. **Terraform Plan** — `terraform plan -refresh=false -no-color`
+5. **Summary** — Results printed to PR via `GITHUB_STEP_SUMMARY`
+
+### How to Configure
+
+#### 1. Push to GitHub
+
+```bash
+git remote add origin https://github.com/YOUR-ORG/hotel-booking-devops.git
+git push -u origin main
 ```
 
-If credentials are not configured, Terraform formatting and validation can still be reviewed locally.
+#### 2. Add AWS Secrets
+
+| Secret Name | Value |
+|------------|-------|
+| `AWS_ACCESS_KEY_ID` | Your AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | Your AWS secret key |
 
 ---
 

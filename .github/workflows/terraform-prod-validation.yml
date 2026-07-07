@@ -1,18 +1,18 @@
-name: Terraform Validation
+name: Terraform Prod Validation
 
 on:
   pull_request:
     paths:
-      - 'infra/**'
-      - '.github/workflows/terraform-validation.yml'
+      - 'infra/envs/prod/**'
+      - '.github/workflows/terraform-prod-validation.yml'
 
 jobs:
   terraform-fmt-validate:
-    name: Terraform Format and Validate
+    name: Terraform Prod — Validate
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/envs/dev
+        working-directory: infra/envs/prod
 
     steps:
       - name: Checkout
@@ -23,7 +23,7 @@ jobs:
         with:
           terraform_version: 1.6.0
 
-      - name: Terraform Format Check
+      - name: Terraform Format
         id: fmt
         run: terraform fmt -recursive ../../
         continue-on-error: true
@@ -45,7 +45,7 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo '## Terraform Validation Results' | tee -a $GITHUB_STEP_SUMMARY
+          echo '## Terraform Prod Validation Results' | tee -a $GITHUB_STEP_SUMMARY
           echo '' | tee -a $GITHUB_STEP_SUMMARY
           echo '- **Format:** ${{ steps.fmt.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
           echo '- **Init:** ${{ steps.init.outcome }}' | tee -a $GITHUB_STEP_SUMMARY

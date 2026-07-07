@@ -1,0 +1,53 @@
+name: Terraform Dev Validation
+
+on:
+  pull_request:
+    paths:
+      - 'infra/envs/dev/**'
+      - '.github/workflows/terraform-dev-validation.yml'
+
+jobs:
+  terraform-fmt-validate:
+    name: Terraform Dev — Validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/envs/dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -recursive ../../
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend=false -upgrade
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        if: success()
+        run: terraform plan -refresh=false -no-color
+        continue-on-error: true
+
+      - name: Summary
+        if: always()
+        run: |
+          echo '## Terraform Dev Validation Results' | tee -a $GITHUB_STEP_SUMMARY
+          echo '' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Format:** ${{ steps.fmt.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Init:** ${{ steps.init.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Validate:** ${{ steps.validate.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Plan:** ${{ steps.plan.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
