@@ -68,7 +68,9 @@ VPC
 
 ```text
 assesment-1/
-├── .gitignore
+|   └──.github/
+│       └── workflows/
+│       └── terraform-validation.yml
 ├── README.md
 ├── output.txt
 ├── docker/
@@ -94,9 +96,6 @@ assesment-1/
 │   └── restore.sh
 ├── backups/
 ├── hotel-booking-devops/
-│   └── .github/
-│       └── workflows/
-│           └── terraform-validation.yml
 └── .gitignore
 ```
 
