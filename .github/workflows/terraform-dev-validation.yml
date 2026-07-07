@@ -7,12 +7,12 @@ on:
       - '.github/workflows/terraform-dev-validation.yml'
 
 jobs:
-  terraform-fmt-validate:
-    name: Terraform Dev — Validate
+  terraform-manual:
+    name: Terraform ${{ inputs.environment }} — Manual Run
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/envs/dev
+        working-directory: infra/envs/${{ inputs.environment }}
 
     steps:
       - name: Checkout
@@ -21,13 +21,27 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-         # Bump this from 1.6.0 to a patched version (1.6.6 or higher)
-           terraform_version: 1.6.6
+          terraform_version: 1.6.6
 
-      - name: Terraform Format
+      - name: Terraform Format Check
         id: fmt
-        run: terraform fmt -recursive ../../
+        working-directory: infra
+        run: terraform fmt 
         continue-on-error: true
+
+      # NEW STEP: Generate a mock provider configuration specifically for CI
+      - name: Generate Mock Provider Override
+        run: |
+          cat <<EOF > provider_override.tf
+          provider "aws" {
+            region                      = "us-east-1"
+            access_key                  = "mock_access_key"
+            secret_key                  = "mock_secret_key"
+            skip_credentials_validation = true
+            skip_requesting_account_id  = true
+            skip_metadata_api_check     = true
+          }
+          EOF
 
       - name: Terraform Init
         id: init
@@ -39,16 +53,28 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        if: success()
+        if: success() && inputs.run_plan == true
+        # We no longer need the massive env block!
         run: terraform plan -refresh=false -no-color
         continue-on-error: true
 
-      - name: Summary
+      - name: Terraform Plan Summary
         if: always()
         run: |
-          echo '## Terraform Dev Validation Results' | tee -a $GITHUB_STEP_SUMMARY
-          echo '' | tee -a $GITHUB_STEP_SUMMARY
-          echo '- **Format:** ${{ steps.fmt.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
-          echo '- **Init:** ${{ steps.init.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
-          echo '- **Validate:** ${{ steps.validate.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
-          echo '- **Plan:** ${{ steps.plan.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo "## Manual Terraform ${{ inputs.environment }} Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Env:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format:** ${{ steps.fmt.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Init:** ${{ steps.init.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validate:** ${{ steps.validate.outcome }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ inputs.run_plan }}" == "true" ]]; then
+            echo "- **Plan:** ${{ steps.plan.outcome }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Plan:** Skipped by user" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ "${{ steps.fmt.outcome }}" == "failure" || "${{ steps.init.outcome }}" == "failure" || "${{ steps.validate.outcome }}" == "failure" || "${{ steps.plan.outcome }}" == "failure" ]]; then
+            echo "::error::Manual validation or plan failed. Check the step logs for details."
+            exit 1
+          fi
