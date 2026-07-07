@@ -32,7 +32,8 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.0
+          # Bump this from 1.6.0 to a patched version (1.6.6 or higher)
+          terraform_version: 1.6.6
 
       - name: Terraform Format
         id: fmt
