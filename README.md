@@ -67,20 +67,20 @@ VPC
 ## Repository Structure
 
 ```text
-hotel-booking-devops
-├──hotel-booking-devops
-|   .github/
-│   └── workflows/
-│       └── terraform-validation.yml
+assesment-1/
+├── .gitignore
+├── README.md
+├── output.txt
 ├── docker/
 │   ├── docker-compose.yml
 │   └── db/
+│       ├── .env
 │       ├── .env.example
 │       ├── migrations/
 │       │   ├── 001_create_schema.sql
 │       │   └── 002_create_indexes.sql
 │       └── seed/
-│           └── 001_dev_seed_hotel_bookings.sql
+│           └── 001_seed_hotel_bookings.sql
 ├── infra/
 │   ├── modules/
 │   │   ├── network/
@@ -92,8 +92,12 @@ hotel-booking-devops
 ├── scripts/
 │   ├── backup.sh
 │   └── restore.sh
-├── .gitignore
-└── README.md
+├── backups/
+├── hotel-booking-devops/
+│   └── .github/
+│       └── workflows/
+│           └── terraform-validation.yml
+└── .gitignore
 ```
 
 ---
