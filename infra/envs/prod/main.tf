@@ -4,7 +4,6 @@ locals {
 
 module "hotel_booking_network" {
   source = "../../modules/network"
-
   resource_name_prefix        = local.resource_name_prefix
   vpc_cidr_block              = "10.20.0.0/16"
   public_subnet_a_cidr_block  = "10.20.1.0/24"
