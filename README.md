@@ -67,8 +67,9 @@ VPC
 ## Repository Structure
 
 ```text
-hotel-booking-devops-assessment/
-├── .github/
+hotel-booking-devops
+├──hotel-booking-devops
+|   .github/
 │   └── workflows/
 │       └── terraform-validation.yml
 ├── docker/
