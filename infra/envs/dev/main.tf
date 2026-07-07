@@ -17,7 +17,6 @@ module "hotel_booking_network" {
   database_port               = 5432
   enable_nat_gateway          = false
   common_tags                 = var.common_tags
-
 }
 
 module "hotel_booking_rds" {
