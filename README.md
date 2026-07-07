@@ -93,12 +93,11 @@ assesment-1/
 │   ├── backup.sh
 │   └── restore.sh
 ├── backups/
-├── hotel-booking-devops/
-│   └── .github/
-│       └── workflows/
-│           └── terraform-Dev-validation.yml
-│           └── terraform-Manual-Trigger.yml
-│           └── terraform-Prod-validation.yml
+|── .github/
+│     └── workflows/
+│         └── terraform-Dev-validation.yml
+│         └── terraform-Manual-Trigger.yml
+│         └── terraform-Prod-validation.yml
 |
 └── .gitignore
 ```
