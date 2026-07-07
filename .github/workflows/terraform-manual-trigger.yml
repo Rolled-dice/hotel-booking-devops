@@ -1,0 +1,70 @@
+name: Terraform Manual Trigger
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (dev or prod)'
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - prod
+      run_plan:
+        description: 'Run terraform plan'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  terraform-manual:
+    name: Terraform ${{ inputs.environment }} — Manual Run
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/envs/${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -recursive ../../
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend=false -upgrade
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        if: ${{ inputs.run_plan == true }}
+        run: terraform plan -refresh=false -no-color
+        continue-on-error: true
+
+      - name: Terraform Plan Summary
+        if: always()
+        run: |
+          echo '## Manual Terraform ${{ inputs.environment }} Validation' | tee -a $GITHUB_STEP_SUMMARY
+          echo '' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Env:** ${{ inputs.environment }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Format:** ${{ steps.fmt.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Init:** ${{ steps.init.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Validate:** ${{ steps.validate.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Plan:** ${{ steps.plan.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '' | tee -a $GITHUB_STEP_SUMMARY
+          echo '### Plan Output' | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' | tee -a $GITHUB_STEP_SUMMARY
+          echo '${{ steps.plan.outputs.stdout }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' | tee -a $GITHUB_STEP_SUMMARY
