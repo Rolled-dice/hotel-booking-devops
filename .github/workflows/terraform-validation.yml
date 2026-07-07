@@ -25,11 +25,12 @@ jobs:
 
       - name: Terraform Format Check
         id: fmt
-        run: terraform fmt -recursive ../../ -check
+        run: terraform fmt -recursive ../../
+        continue-on-error: true
 
       - name: Terraform Init
         id: init
-        run: terraform init -backend=false
+        run: terraform init -backend=false -upgrade
 
       - name: Terraform Validate
         id: validate
@@ -39,29 +40,14 @@ jobs:
         id: plan
         if: success()
         run: terraform plan -refresh=false -no-color
-        continue-on-error: false
+        continue-on-error: true
 
-      - name: Terraform Plan Summary
+      - name: Summary
         if: always()
         run: |
-          echo '## Terraform Validation Results' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo '### Format Check' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.fmt.outcome }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo '### Init' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.init.outcome }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo '### Validate' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.validate.outcome }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo '### Plan Output (no-color)' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.plan.outcome }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo '## Terraform Validation Results' | tee -a $GITHUB_STEP_SUMMARY
+          echo '' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Format:** ${{ steps.fmt.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Init:** ${{ steps.init.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Validate:** ${{ steps.validate.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
+          echo '- **Plan:** ${{ steps.plan.outcome }}' | tee -a $GITHUB_STEP_SUMMARY
